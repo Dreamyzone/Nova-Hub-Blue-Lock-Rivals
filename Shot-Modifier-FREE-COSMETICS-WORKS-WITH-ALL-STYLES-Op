@@ -1,5 +1,5 @@
 -- =========================================================================
--- 1. PRE-LOAD SYSTEM NOTIFICATIONNNNNNN
+-- 1. PRE-LOAD SYSTEM NOTIFICATION
 -- =========================================================================
 pcall(function()
     game:GetService("StarterGui"):SetCore("SendNotification", {
@@ -593,4 +593,3 @@ CosTab:CreateButton({
 })
 
 Rayfield:Notify({ Title = "Loaded", Content = "Nova Hub is Ready.", Duration = 3, Image = 4483362458 })
-
