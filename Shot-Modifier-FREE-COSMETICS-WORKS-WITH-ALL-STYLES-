@@ -1,0 +1,596 @@
+-- =========================================================================
+-- 1. PRE-LOAD SYSTEM NOTIFICATIONNNNNNN
+-- =========================================================================
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Nova Hub",
+        Text = "helo",
+        Duration = 5
+    })
+end)
+
+-- =========================================================================
+-- 2. SECURE INITIALIZATION 
+-- =========================================================================
+getgenv().SecureMode = true
+getgenv().RAYFIELD_SECURE = true
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local hook = hookfunction or replaceclosure or detour_function
+
+-- =========================================================================
+-- 3. TARGET MODULE INTEGRITY CHECKS & CACHING
+-- =========================================================================
+local balanceSuccess, AbilityBalancing = pcall(function() return require(ReplicatedStorage:WaitForChild("AbilityBalancing")) end)
+local utilsSuccess, AbilityUtils = pcall(function() return require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AbilityUtils")) end)
+
+local originalRegPower = (balanceSuccess and AbilityBalancing.DirectShot) and AbilityBalancing.DirectShot.ShotPower or 100
+local originalNelPower = (balanceSuccess and AbilityBalancing.NELDirectShot) and AbilityBalancing.NELDirectShot.ShotPower or 43
+local originalKaiserPower = (balanceSuccess and AbilityBalancing.KaiserImpact) and AbilityBalancing.KaiserImpact.ShotPower or 250
+local originalActivationRange = (balanceSuccess and AbilityBalancing.Fadeaway) and AbilityBalancing.Fadeaway.ActivationRangePlayer or 30
+local originalKaiserCooldown = (balanceSuccess and AbilityBalancing.KaiserImpact) and AbilityBalancing.KaiserImpact.Cooldown or 15
+local originalKaiserVolleyCooldown = (balanceSuccess and AbilityBalancing.KaiserVolley) and AbilityBalancing.KaiserVolley.Cooldown or 15
+local oldEnemyTarget = (utilsSuccess and AbilityUtils.rules) and AbilityUtils.rules.enemyTarget or nil
+
+local originalMagnusPower = (balanceSuccess and AbilityBalancing.Magnus) and AbilityBalancing.Magnus.ShotPower or 350
+local originalMagnusCooldown = (balanceSuccess and AbilityBalancing.Magnus) and AbilityBalancing.Magnus.Cooldown or 20
+local originalBeinschussPower = (balanceSuccess and AbilityBalancing.Beinschuss) and AbilityBalancing.Beinschuss.ShotPower or 300
+local originalBeinschussRange = (balanceSuccess and AbilityBalancing.Beinschuss) and AbilityBalancing.Beinschuss.ActivationRangePlayer or 25
+local originalBeinschussCooldown = (balanceSuccess and AbilityBalancing.Beinschuss) and AbilityBalancing.Beinschuss.Cooldown or 15
+
+getgenv().BypassFadeawayChecks = false
+getgenv().BypassKaiserDribbleCheck = false
+getgenv().BypassKaiserVolleyCheck = false
+getgenv().NoEmperorCooldown = false
+getgenv().NoKaiserImpactCooldown = false
+getgenv().NoEmperorDribbleUltCooldown = false
+getgenv().NoKaiserVolleyCooldown = false
+getgenv().BypassBeinschussChecks = false
+
+-- =========================================================================
+-- 4. ENVIRONMENT UTILITY HOOKS (Abilities)
+-- =========================================================================
+if utilsSuccess and AbilityUtils.rules then
+    AbilityUtils.rules.enemyTarget = function(...)
+        if getgenv().BypassFadeawayChecks then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then return player.Character end
+            end
+            return LocalPlayer.Character
+        end
+        return oldEnemyTarget(...)
+    end
+end
+
+-- Hook for Core Kaiser Dribble Router (Emperors Route Bypass & No Cooldown)
+pcall(function()
+    local rawDribbleRouter = require(ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("AbilityController"):WaitForChild("AbilitiesClient"):WaitForChild("Kaiser"):WaitForChild("KaiserDribble"))
+    if hook and type(rawDribbleRouter) == "function" then
+        hook(rawDribbleRouter, function(p_u_4, p_u_5, p_u_6)
+            if getgenv().NoEmperorCooldown and p_u_4 then p_u_4.AbilityTwo = 0 end
+            
+            if getgenv().BypassKaiserDribbleCheck then
+                local v_u_3 = (balanceSuccess and AbilityBalancing.KaiserDribble) or { ActivationRangePlayer = 25, Cooldown = 15 }
+                local v7 = v_u_3.ActivationRangePlayer
+                local v8 = game.Players:GetPlayers()
+                local v9 = {}
+                local v10 = nil
+                
+                for _, v11 in pairs(v8) do
+                    if v11.Team ~= game.Teams.Visitor and (v11.Character and v11.Character:FindFirstChild("HumanoidRootPart") ~= nil and (v11.Team ~= p_u_5.Team and not (v11.Character.Values.Goalie.Value and v11.Character.Values.IsInPenalty.Value))) then
+                        local v12 = p_u_6.HumanoidRootPart.CFrame.LookVector:Dot((v11.Character.HumanoidRootPart.Position - p_u_6.HumanoidRootPart.Position).Unit)
+                        local v13 = math.acos(v12)
+                        if v13 < 1.5707963267948966 then table.insert(v9, v11.Character) end
+                    end
+                end
+                for _, v16 in pairs(v9) do
+                    local v17 = (v16.HumanoidRootPart.Position - p_u_6.HumanoidRootPart.Position).Magnitude
+                    if v17 < v7 then v10 = v16; v7 = v17 end
+                end
+                table.clear(v9)
+                table.clear(v8)
+                
+                if v10 == nil and workspace:FindFirstChild("PassRig") then v10 = workspace.PassRig end
+                if v10 == nil then
+                    for _, pl in pairs(game.Players:GetPlayers()) do
+                        if pl ~= p_u_5 and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then v10 = pl.Character; break end
+                    end
+                    if v10 == nil then v10 = p_u_6 end
+                end
+                
+                local scriptParentName, scriptName = "Off-Ball", "Dribble"
+                pcall(function() local env = getfenv(rawDribbleRouter); if env and env.script then scriptParentName = env.script.Parent.Name; scriptName = env.script.Name end end)
+                
+                p_u_4.Animations:StopAnims()
+                p_u_4.Animations.Abilities.KaiserDribbleZigZag.Priority = Enum.AnimationPriority.Action4
+                p_u_4.Animations.Abilities.KaiserDribbleZigZag:Play(0, 1, 0.9)
+                
+                if not getgenv().NoEmperorCooldown then p_u_4:AbilityCooldown("2", p_u_4.Animations.Abilities.KaiserDribbleZigZag.Length) end
+                
+                p_u_4.StatesController.States.Ability = true
+                p_u_4.AbilityService.Ability:Fire("KaiserDribble", { ["State"] = scriptParentName, ["Action"] = scriptName, ["Object"] = v10 })
+                
+                local v_u_18 = task.delay(3.5, function() if p_u_4.ABC then p_u_4.ABC:Clean() end end)
+                local v_u_19 = true
+                
+                p_u_4.ABC:Add(function()
+                    if coroutine.status(v_u_18) ~= "running" then task.cancel(v_u_18) end
+                    p_u_4.StatesController.States.Ability = false
+                    task.delay(0.416666667, function() p_u_4.Animations.Abilities.KaiserDribbleZigZag:Stop(); p_u_4.Animations.Ball.KaiserDribbleZigZag:Stop() end)
+                    
+                    local v_u_20 = not v_u_19 and p_u_5.PlayerGui.InGameUI.Bottom.Abilities:FindFirstChild("2")
+                    if v_u_20 then
+                        p_u_4.OverwriteText["2"] = "Subjugation"
+                        local v_u_21 = v_u_20:FindFirstChild("UIScale")
+                        if v_u_21 then v_u_21.Scale = 1.25 end
+                        v_u_20.ImageColor3 = Color3.fromRGB(26, 255, 53)
+                        
+                        p_u_4.UITween1 = game:GetService("TweenService"):Create(v_u_21, TweenInfo.new(0.85, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), { ["Scale"] = 1 })
+                        p_u_4.UITween1:Play()
+                        p_u_4.UITween2 = game:GetService("TweenService"):Create(v_u_20, TweenInfo.new(0.85, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), { ["ImageColor3"] = Color3.fromRGB(255, 255, 255) })
+                        p_u_4.UITween2:Play()
+                        
+                        p_u_6:SetAttribute("KaiserDribbleTake", true)
+                        p_u_4.KaiserDribbleTake = true
+                        
+                        local v_u_22 = p_u_6.Values.HasBall:GetPropertyChangedSignal("Value"):Connect(function()
+                            if not p_u_6.Values.HasBall.Value then
+                                if p_u_5.PlayerStats.InAwakening.Value then p_u_4.OverwriteText["2"] = "Magnus" elseif p_u_6.Values.HasBall.Value then p_u_4.OverwriteText["2"] = "Emperor's Dribble" else p_u_4.OverwriteText["2"] = "Royal Route" end
+                                if p_u_4.UITween2 then p_u_4.UITween2:Cancel(); p_u_4.UITween2 = nil end
+                                if p_u_4.UITween1 then p_u_4.UITween1:Cancel(); p_u_4.UITween1 = nil end
+                                if v_u_21 then v_u_21.Scale = 1 end
+                                v_u_20.ImageColor3 = Color3.fromRGB(255, 255, 255)
+                                p_u_4.KaiserDribbleTake = nil
+                                p_u_6:SetAttribute("KaiserDribbleTake", nil)
+                            end
+                        end)
+                        p_u_4.LostBallConnection = v_u_22
+                        
+                        task.delay(1.5, function()
+                            if p_u_4.KaiserDribbleTake then
+                                if v_u_22 then v_u_22:Disconnect() end
+                                if p_u_4.LostBallConnection then p_u_4.LostBallConnection = nil end
+                                if p_u_5.PlayerStats.InAwakening.Value then p_u_4.OverwriteText["2"] = "Magnus" elseif p_u_6.Values.HasBall.Value then p_u_4.OverwriteText["2"] = "Emperor's Dribble" else p_u_4.OverwriteText["2"] = "Royal Route" end
+                                p_u_4.UITween2 = nil; p_u_4.UITween1 = nil; p_u_4.KaiserDribbleTake = nil
+                                p_u_6:SetAttribute("KaiserDribbleTake", nil)
+                                if not getgenv().NoEmperorCooldown then p_u_4:AbilityCooldown("2", v_u_3.Cooldown) end
+                            end
+                        end)
+                    end
+                end)
+                
+                p_u_4.ABC:Connect(p_u_4.AbilityService.Ability, function(p23)
+                    if p23.State == "Failed" then
+                        if not getgenv().NoEmperorCooldown then p_u_4:AbilityCooldown("2", v_u_3.Cooldown) end
+                        p_u_4.ABC:Clean()
+                    elseif p23.State == "PrepareTake" then
+                        v_u_19 = false
+                        p_u_4.ABC:Clean()
+                    end
+                end)
+                return
+            end
+            return rawDribbleRouter(p_u_4, p_u_5, p_u_6)
+        end)
+    end
+end)
+
+-- Hook for Kaiser Volley 
+pcall(function()
+    local rawVolleyFunc = require(ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("AbilityController"):WaitForChild("AbilitiesClient"):WaitForChild("Kaiser"):WaitForChild("KaiserVolley"))
+    if hook and type(rawVolleyFunc) == "function" then
+        hook(rawVolleyFunc, function(p1, p2, p3)
+            if getgenv().NoKaiserVolleyCooldown and p1 then p1.AbilityThree = 0 end
+            if getgenv().BypassKaiserVolleyCheck then
+                local v1 = if p3 then p3:FindFirstChild("HumanoidRootPart") else p3
+                if not (v1 and workspace.CurrentCamera) then return end
+                if p1.ABC then p1.ABC:Clean() end
+                
+                local targetCharacter = nil
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player.Team == p2.Team and player ~= p2 and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        targetCharacter = player.Character; break
+                    end
+                end
+                if not targetCharacter then targetCharacter = workspace:FindFirstChild("PassRig") or p3 end
+                
+                if targetCharacter then
+                    p1.StatesController.States.Ability = true
+                    local configVolley = (balanceSuccess and AbilityBalancing.KaiserVolley) or { ShotTiltVector = Vector3.new(0, 0.2, 0), ShotPower = 180, Cooldown = 15 }
+                    
+                    if p1.AbilityCooldown then p1:AbilityCooldown("3", configVolley.Cooldown) end
+                    p1.AbilityService.Ability:Fire("KaiserVolley", targetCharacter)
+                    
+                    p1.ABC:Connect(p1.AbilityService.Ability, function(ballInstance, curveVector, actionState)
+                        if actionState ~= "start" then return end
+                        local Promise = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Promise"))
+                        local startTick = tick()
+                        local heartbeatConn
+                        
+                        Promise.new(function(resolve)
+                            heartbeatConn = p1.ABC:Connect(game:GetService("RunService").Heartbeat, function()
+                                if tick() > startTick + 5 or (not ballInstance or ballInstance.OnPlayer.Value) then
+                                    heartbeatConn:Disconnect(); resolve()
+                                end
+                            end)
+                        end):catch(warn)
+                        
+                        p1.Animations:StopAnims()
+                        p1.Animations.Abilities.KaiserVolley.Priority = Enum.AnimationPriority.Action4
+                        p1.Animations.Abilities.KaiserVolley:Play()
+                        p1.Animations.Ball.KaiserVolley.Priority = Enum.AnimationPriority.Action4
+                        p1.Animations.Ball.KaiserVolley:Play()
+                        p1.ABC:Clean()
+                        
+                        local waitTimeout = 0
+                        while p3.Values.HasBall.Value and waitTimeout < 1.5 do waitTimeout = waitTimeout + task.wait() end
+                        
+                        p1.StatesController.States.Ability = false
+                        local cVec = typeof(curveVector) == "Vector3" and curveVector or Vector3.zero
+                        ballInstance.AssemblyLinearVelocity = (workspace.CurrentCamera.CFrame.LookVector + configVolley.ShotTiltVector + (cVec / 2)) * configVolley.ShotPower
+                        
+                        task.delay(0.1, function()
+                            local trajectoryLerp = -40
+                            p1.ABC:Connect(game:GetService("RunService").Heartbeat, function(deltaTime)
+                                -- FIXED: Safety check to ensure ballInstance still exists in the workspace
+                                if not ballInstance or not ballInstance.Parent then 
+                                    p1.ABC:Clean()
+                                    return 
+                                end
+                                
+                                trajectoryLerp = trajectoryLerp + 25 * deltaTime
+                                if trajectoryLerp >= -25 then p1.ABC:Clean() end
+                                ballInstance.AssemblyLinearVelocity = ballInstance.AssemblyLinearVelocity:Lerp(ballInstance.AssemblyLinearVelocity + (cVec * trajectoryLerp), 6.5 * deltaTime)
+                            end)
+                        end)
+                        
+                        local actualBall = ReplicatedStorage:FindFirstChild("Football") and ReplicatedStorage.Football.Value or ballInstance
+                        p1.BallController:DragBall(actualBall)
+                    end)
+                    return
+                end
+            end
+            return rawVolleyFunc(p1, p2, p3)
+        end)
+    end
+end)
+
+-- Hook for KaiserDribbleULT
+pcall(function()
+    local rawUltModule = require(ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("AbilityController"):WaitForChild("AbilitiesClient"):WaitForChild("Kaiser"):WaitForChild("KaiserDribbleULT"):WaitForChild("On-Ball"))
+    if hook and type(rawUltModule) == "function" then
+        hook(rawUltModule, function(p_u_2, p_u_3, p_u_4)
+            if getgenv().NoEmperorCooldown then
+                local v_u_1 = (balanceSuccess and AbilityBalancing.KaiserDribble) or { Cooldown = 15 }
+                local v_u_5 = p_u_2.CopiedStyle and "1" or "2"
+                
+                p_u_2.Animations:StopAnims()
+                p_u_2.Animations.Abilities.KaiserDribbleZigZag.Priority = Enum.AnimationPriority.Action4
+                p_u_2.Animations.Abilities.KaiserDribbleZigZag:Play(0, 1, 0.9)
+                p_u_2.Animations.Ball.KaiserDribbleZigZag:Play(0, 1, 0.9)
+                
+                p_u_2.StatesController.States.Ability = true
+                p_u_2.AbilityService.Ability:Fire("KaiserDribble", { ["State"] = "On-Ball", ["Action"] = "Dribble" })
+                
+                local v_u_6 = task.delay(3.5, function() if p_u_2.ABC then p_u_2.ABC:Clean() end end)
+                local v_u_7 = true
+                p_u_2.ABC:Add(function()
+                    if coroutine.status(v_u_6) ~= "running" then task.cancel(v_u_6) end
+                    p_u_2.StatesController.States.Ability = false
+                    task.delay(0.416666667, function() p_u_2.Animations.Abilities.KaiserDribbleZigZag:Stop(); p_u_2.Animations.Ball.KaiserDribbleZigZag:Stop() end)
+                    
+                    local v_u_8 = not v_u_7 and p_u_3.PlayerGui.InGameUI.Bottom.Abilities:FindFirstChild(v_u_5)
+                    if v_u_8 then
+                        p_u_2.OverwriteText[v_u_5] = "IMPACT."
+                        local v_u_9 = v_u_8:FindFirstChild("UIScale")
+                        if v_u_9 then v_u_9.Scale = 1.25 end
+                        v_u_8.ImageColor3 = Color3.fromRGB(26, 255, 53)
+                        
+                        p_u_2.UITween1 = game:GetService("TweenService"):Create(v_u_9, TweenInfo.new(0.85, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), { ["Scale"] = 1 })
+                        p_u_2.UITween1:Play()
+                        p_u_2.UITween2 = game:GetService("TweenService"):Create(v_u_8, TweenInfo.new(0.85, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), { ["ImageColor3"] = Color3.fromRGB(255, 255, 255) })
+                        p_u_2.UITween2:Play()
+                        
+                        p_u_4:SetAttribute("KaiserDribbleShot", true)
+                        p_u_2.KaiserDribbleShot = true
+                        
+                        local v_u_10 = nil
+                        v_u_10 = p_u_4.Values.HasBall:GetPropertyChangedSignal("Value"):Connect(function()
+                            if not p_u_4.Values.HasBall.Value then
+                                if p_u_3.PlayerStats.InAwakening.Value then p_u_2.OverwriteText[v_u_5] = "Magnus" elseif p_u_4.Values.HasBall.Value then p_u_2.OverwriteText[v_u_5] = "Emperor's Dribble" else p_u_2.OverwriteText[v_u_5] = "Royal Route" end
+                                if p_u_2.UITween2 then p_u_2.UITween2:Cancel(); p_u_2.UITween2 = nil end
+                                if p_u_2.UITween1 then p_u_2.UITween1:Cancel(); p_u_2.UITween1 = nil end
+                                if v_u_9 then v_u_9.Scale = 1 end
+                                v_u_8.ImageColor3 = Color3.fromRGB(255, 255, 255)
+                                p_u_2.KaiserDribbleShot = nil
+                                p_u_4:SetAttribute("KaiserDribbleShot", nil)
+                                if v_u_10 then v_u_10:Disconnect() end
+                                p_u_2.LostBallConnection = nil
+                            end
+                        end)
+                        p_u_2.LostBallConnection = v_u_10
+                        
+                        task.delay(0.85, function()
+                            if p_u_2.KaiserDribbleShot then
+                                if v_u_10 then v_u_10:Disconnect() end
+                                if p_u_2.LostBallConnection then p_u_2.LostBallConnection = nil end
+                                if p_u_3.PlayerStats.InAwakening.Value then p_u_2.OverwriteText[v_u_5] = "Magnus" elseif p_u_4.Values.HasBall.Value then p_u_2.OverwriteText[v_u_5] = "Emperor's Dribble" else p_u_2.OverwriteText[v_u_5] = "Royal Route" end
+                                p_u_2.UITween2 = nil; p_u_2.UITween1 = nil; p_u_2.KaiserDribbleShot = nil
+                                p_u_4:SetAttribute("KaiserDribbleShot", nil)
+                            end
+                        end)
+                    end
+                end)
+                
+                p_u_2.ABC:Connect(p_u_2.AbilityService.Ability, function(p11)
+                    if p11.State == "Failed" then p_u_2.ABC:Clean() elseif p11.State == "PrepareShot" then v_u_7 = false; p_u_2.ABC:Clean() end
+                end)
+                return
+            end
+            return rawUltModule(p_u_2, p_u_3, p_u_4)
+        end)
+    end
+end)
+
+-- Hook for Core Kaiser Magnus & Beinschuss
+pcall(function()
+    local rawMagnusFunc = require(ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("AbilityController"):WaitForChild("AbilitiesClient"):WaitForChild("Kaiser"):WaitForChild("Magnus"))
+    if hook and type(rawMagnusFunc) == "function" then
+        hook(rawMagnusFunc, function(p_u_3, p2, p_u_4)
+            if getgenv().NoEmperorCooldown and p_u_3 then p_u_3.AbilityTwo = 0 end
+            return rawMagnusFunc(p_u_3, p2, p_u_4)
+        end)
+    end
+end)
+
+pcall(function()
+    local rawBeinschussFunc = require(ReplicatedStorage:WaitForChild("Controllers"):WaitForChild("AbilityController"):WaitForChild("AbilitiesClient"):WaitForChild("Kaiser"):WaitForChild("Beinschuss"))
+    if hook and type(rawBeinschussFunc) == "function" then
+        hook(rawBeinschussFunc, function(p_u_6, p7, p_u_8)
+            if getgenv().NoEmperorCooldown and p_u_6 then p_u_6.AbilityOne = 0 end
+            
+            if getgenv().BypassBeinschussChecks then
+                local v_u_9 = p_u_8 and p_u_8:FindFirstChild("HumanoidRootPart")
+                local v_u_10 = workspace.CurrentCamera
+                if not (v_u_9 and v_u_10) then return end
+                if not p_u_8.Values.HasBall.Value then return end
+                if p_u_6.ABC then p_u_6.ABC:Clean() end
+                
+                p_u_6.StatesController.States.Ability = true
+                p_u_8.HumanoidRootPart.Anchored = true
+                p_u_6.Animations:StopAnims()
+                p_u_6.Animations.Abilities.BeinschussPlr1.Priority = Enum.AnimationPriority.Action4
+                p_u_6.Animations.Abilities.BeinschussPlr1:Play()
+                p_u_6.Animations.Ball.KaiserBeinschuss.Priority = Enum.AnimationPriority.Action4
+                p_u_6.Animations.Ball.KaiserBeinschuss:Play()
+                p_u_6.AbilityService.Ability:Fire("Beinschuss")
+                
+                if not getgenv().NoEmperorCooldown then
+                    local v_u_4 = balanceSuccess and AbilityBalancing.Beinschuss or { Cooldown = 15 }
+                    p_u_6:AbilityCooldown("1", v_u_4.Cooldown)
+                end
+                
+                p_u_6.ABC:Add(function() p_u_6.StatesController.States.Ability = false; p_u_8.HumanoidRootPart.Anchored = false end)
+                
+                local v_u_4 = balanceSuccess and AbilityBalancing.Beinschuss or { MoveSpeedValue = 40, MoveSpeedDuration = 0.5, ShotTiltVector = Vector3.new(0, 0, 0), ShotPower = 300 }
+                local v_u_13 = v_u_4.MoveSpeedValue
+                local v_u_14 = tick()
+                local v_u_15 = nil
+                v_u_15 = p_u_6.ABC:Connect(game:GetService("RunService").Heartbeat, function(p16)
+                    if tick() - v_u_14 >= v_u_4.MoveSpeedDuration then
+                        v_u_15:Disconnect()
+                        if not p_u_8.Values.HasBall then p_u_6.ABC:Clean() end
+                    else
+                        v_u_13 = v_u_13 - 25 * p16
+                    end
+                end)
+                
+                p_u_6.ABC:Add(task.delay(15, function() p_u_6.ABC:Clean() end))
+                
+                local v_u_21 = v_u_10.CFrame.LookVector + v_u_4.ShotTiltVector
+                p_u_6.ABC:Connect(p_u_6.AbilityService.Ability, function(p_u_22)
+                    p_u_6.StatesController.States.Ability = false
+                    p_u_22.AssemblyLinearVelocity = v_u_21 * v_u_4.ShotPower
+                    p_u_6.BallController:DragBall(p_u_22)
+                    local v_u_23 = tick()
+                    local v_u_24 = p_u_22.Position
+                    p_u_6.ABC:Connect(game:GetService("RunService").Stepped, function(_)
+                        local v25 = RaycastParams.new()
+                        v25.FilterType = Enum.RaycastFilterType.Exclude
+                        v25.FilterDescendantsInstances = { p_u_22 }
+                        v25.CollisionGroup = "Trajectory"
+                        local v30 = workspace:Raycast(p_u_22.Position, v_u_21 * 10, v25)
+                        if tick() - v_u_23 >= 3 or v30 and v30.Instance or (p_u_22.OnPlayer.Value or (p_u_22.Position - v_u_24).Magnitude >= 120) then
+                            p_u_6.ABC:Clean()
+                        end
+                        p_u_22.AssemblyLinearVelocity = v_u_21 * v_u_4.ShotPower
+                    end)
+                end)
+                return
+            end
+            return rawBeinschussFunc(p_u_6, p7, p_u_8)
+        end)
+    end
+end)
+
+-- =========================================================================
+-- 5. DYNAMIC COSMETICS SEARCH & ASSET LOCATOR
+-- =========================================================================
+local availableCosmetics = {}
+local CosmeticsFolder = ReplicatedStorage:FindFirstChild("Controllers") and ReplicatedStorage.Controllers:FindFirstChild("CosmeticsController")
+
+if CosmeticsFolder then
+    for _, child in ipairs(CosmeticsFolder:GetChildren()) do table.insert(availableCosmetics, child.Name) end
+else
+    availableCosmetics = {"2026 Aura", "2026 Wings", "2026 Cape", "Destroyer Aura", "Metavision Aura"}
+end
+table.sort(availableCosmetics)
+
+local function GiveLocalCosmetic(cosmeticName)
+    local char = LocalPlayer.Character
+    local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("HumanoidRootPart")
+    if not char or not torso then return end
+    
+    local targetSource = CosmeticsFolder and CosmeticsFolder:FindFirstChild(cosmeticName)
+    if not targetSource then
+        Rayfield:Notify({ Title = "Error", Content = "Cosmetic folder asset not found on client.", Duration = 3 })
+        return
+    end
+    
+    for _, v in ipairs(torso:GetChildren()) do
+        if v:GetAttribute("IsLocalMenuCosmetic") then v:Destroy() end
+    end
+
+    pcall(function()
+        local emitModule = require(ReplicatedStorage.Shared.EmitModule)
+        local partAsset = targetSource:FindFirstChild("Part")
+        if partAsset then
+            local clonedPart = partAsset:Clone()
+            clonedPart:SetAttribute("IsLocalMenuCosmetic", true)
+            local referenceTorso = targetSource:FindFirstChild("Torso")
+            if referenceTorso then
+                clonedPart:PivotTo(torso.CFrame * referenceTorso.CFrame:ToObjectSpace(clonedPart:GetPivot()))
+            else
+                clonedPart.CFrame = torso.CFrame
+            end
+            clonedPart.Parent = torso
+            CollectionService:AddTag(clonedPart, "Cosmetic" .. cosmeticName)
+            local weld = Instance.new("WeldConstraint")
+            weld.Part0 = torso; weld.Part1 = clonedPart; weld.Parent = clonedPart
+        end
+        
+        local torsoSource = targetSource:FindFirstChild("Torso")
+        if torsoSource then
+            local trackedEmitters = {}
+            for _, element in ipairs(torsoSource:GetChildren()) do
+                local clonedElement = element:Clone()
+                clonedElement:SetAttribute("IsLocalMenuCosmetic", true)
+                clonedElement.Parent = torso
+                table.insert(trackedEmitters, clonedElement)
+                CollectionService:AddTag(clonedElement, "Cosmetic" .. cosmeticName)
+            end
+            
+            task.spawn(function()
+                while char and char.Parent and torso and torso.Parent do
+                    for _, emitter in ipairs(trackedEmitters) do
+                        if emitter and emitModule and emitModule.emit then emitModule.emit(emitter) end
+                    end
+                    task.wait(1.5)
+                end
+            end)
+        end
+    end)
+end
+
+-- Function to attempt triggering the Cmdr Global command (Requires Server Admin to succeed)
+local function AttemptGlobalCosmetic(cosmeticName)
+    pcall(function()
+        local cmdrModule = ReplicatedStorage:FindFirstChild("CmdrClient")
+        if cmdrModule then
+            local Cmdr = require(cmdrModule)
+            if Cmdr and Cmdr.Dispatcher then
+                -- Ask Cmdr to evaluate and run the command just like if we typed it in the UI
+                Cmdr.Dispatcher:EvaluateAndRun("GlobalCosmetic " .. cosmeticName)
+                Rayfield:Notify({ Title = "Attempted", Content = "Sent GlobalCosmetic request to server via Cmdr.", Duration = 4 })
+            else
+                Rayfield:Notify({ Title = "Failed", Content = "Found CmdrClient but could not access Dispatcher.", Duration = 3 })
+            end
+        else
+            Rayfield:Notify({ Title = "Failed", Content = "Could not find CmdrClient in ReplicatedStorage.", Duration = 3 })
+        end
+    end)
+end
+
+-- =========================================================================
+-- 6. RAYFIELD INTERFACE COMPOSITION
+-- =========================================================================
+local Window = Rayfield:CreateWindow({
+    Name = "Ability Modifier/Menu",
+    ScriptID = "sid_9zw8h6c4y1do",
+    Icon = 0,
+    LoadingTitle = "ability modifier/menu",
+    LoadingSubtitle = "made by Dreamyzone",
+    ShowText = "Ability Menu",
+    Theme = "DarkBlue",
+    ToggleUIKeybind = "K",
+    DisableRayfieldPrompts = true,
+    DisableBuildWarnings = true,
+    ConfigurationSaving = { Enabled = false }
+})
+
+local ModTab = Window:CreateTab("Modifiers", 4483362458)
+local UltShotTab = Window:CreateTab("Ult Shot Modifiers", 4483362458)
+local CosTab = Window:CreateTab("Cosmetics", 4483362458)
+
+-- =========================================================================
+-- 7. MODIFIER CONTROLS (Standard Tab)
+-- =========================================================================
+ModTab:CreateSection("Shot Power Adjustments")
+ModTab:CreateSlider({ Name = "Regular DirectShot Power", Range = {0, 1000}, Increment = 10, CurrentValue = originalRegPower, Flag = "RegDirectShotSlider", Callback = function(V) if balanceSuccess and AbilityBalancing.DirectShot then AbilityBalancing.DirectShot.ShotPower = V; if V > 150 then AbilityBalancing.DirectShot.ShotTiltVector = Vector3.new(0, 0, 0) end end end })
+ModTab:CreateSlider({ Name = "NEL DirectShot Power", Range = {0, 1000}, Increment = 10, CurrentValue = originalNelPower, Flag = "NELDirectShotSlider", Callback = function(V) if balanceSuccess and AbilityBalancing.NELDirectShot then AbilityBalancing.NELDirectShot.ShotPower = V; if V > 150 then AbilityBalancing.NELDirectShot.ShotTiltVector = Vector3.new(0, 0, 0) end end end })
+ModTab:CreateSlider({ Name = "Kaiser Impact Shot Power", Range = {0, 1500}, Increment = 10, CurrentValue = originalKaiserPower, Flag = "KaiserImpactSlider", Callback = function(V) if balanceSuccess and AbilityBalancing.KaiserImpact then AbilityBalancing.KaiserImpact.ShotPower = V; if V > 200 then AbilityBalancing.KaiserImpact.ShotTiltVector = Vector3.new(0, 0, 0) end end end })
+
+ModTab:CreateSection("Range & Target Bypasses")
+ModTab:CreateToggle({ Name = "Bypass Fadeaway Range Checks", CurrentValue = false, Flag = "FadeawayBypassToggle", Callback = function(V) getgenv().BypassFadeawayChecks = V; if balanceSuccess and AbilityBalancing.Fadeaway then AbilityBalancing.Fadeaway.ActivationRangePlayer = V and 99999 or originalActivationRange end end })
+ModTab:CreateToggle({ Name = "Emperors Route Bypass Check", CurrentValue = false, Flag = "KaiserDribbleBypassToggle", Callback = function(V) getgenv().BypassKaiserDribbleCheck = V end })
+ModTab:CreateToggle({ Name = "Bypass Kaiser Volley Teammate Check", CurrentValue = false, Flag = "KaiserVolleyBypassToggle", Callback = function(V) getgenv().BypassKaiserVolleyCheck = V end })
+
+ModTab:CreateSection("Cooldown Removes")
+ModTab:CreateToggle({ Name = "No Cooldown for Kaiser Impact", CurrentValue = false, Flag = "KaiserImpactCooldownToggle", Callback = function(V) getgenv().NoKaiserImpactCooldown = V; if balanceSuccess and AbilityBalancing.KaiserImpact then AbilityBalancing.KaiserImpact.Cooldown = V and 0 or originalKaiserCooldown end end })
+ModTab:CreateToggle({ Name = "No Cooldown for Kaiser Volley", CurrentValue = false, Flag = "KaiserVolleyCooldownToggle", Callback = function(V) getgenv().NoKaiserVolleyCooldown = V; if balanceSuccess and AbilityBalancing.KaiserVolley then AbilityBalancing.KaiserVolley.Cooldown = V and 0 or originalKaiserVolleyCooldown end end })
+ModTab:CreateToggle({ Name = "No Cooldown For Emperors Route", CurrentValue = false, Flag = "EmperorCooldownToggle", Callback = function(V) getgenv().NoEmperorCooldown = V end })
+ModTab:CreateToggle({ Name = "No Cooldown for Emperor's Dribble Ult", CurrentValue = false, Flag = "EmperorUltCooldownToggle", Callback = function(V) getgenv().NoEmperorDribbleUltCooldown = V end })
+
+-- =========================================================================
+-- 8. ULT SHOT MODIFIERS TAB CONTROLS
+-- =========================================================================
+UltShotTab:CreateSection("Magnus Power Adjustments")
+UltShotTab:CreateSlider({ Name = "Magnus Shot Power", Range = {0, 2000}, Increment = 25, CurrentValue = originalMagnusPower, Flag = "MagnusPowerSlider", Callback = function(V) if balanceSuccess and AbilityBalancing.Magnus then AbilityBalancing.Magnus.ShotPower = V end end })
+UltShotTab:CreateToggle({ Name = "No Cooldown for Magnus", CurrentValue = false, Flag = "MagnusCooldownToggle", Callback = function(V) if balanceSuccess and AbilityBalancing.Magnus then AbilityBalancing.Magnus.Cooldown = V and 0 or originalMagnusCooldown end end })
+
+UltShotTab:CreateSection("Beinschuss Configuration")
+UltShotTab:CreateSlider({ Name = "Beinschuss Shot Power", Range = {0, 2000}, Increment = 25, CurrentValue = originalBeinschussPower, Flag = "BeinschussPowerSlider", Callback = function(V) if balanceSuccess and AbilityBalancing.Beinschuss then AbilityBalancing.Beinschuss.ShotPower = V end end })
+UltShotTab:CreateToggle({ Name = "Bypass Beinschuss Enemy Requirements", CurrentValue = false, Flag = "BeinschussBypassToggle", Callback = function(V) getgenv().BypassBeinschussChecks = V; if balanceSuccess and AbilityBalancing.Beinschuss then AbilityBalancing.Beinschuss.ActivationRangePlayer = V and 99999 or originalBeinschussRange end end })
+UltShotTab:CreateToggle({ Name = "No Cooldown for Beinschuss", CurrentValue = false, Flag = "BeinschussCooldownToggle", Callback = function(V) if balanceSuccess and AbilityBalancing.Beinschuss then AbilityBalancing.Beinschuss.Cooldown = V and 0 or originalBeinschussCooldown end end })
+
+-- =========================================================================
+-- 9. COSMETICS CONTROLS
+-- =========================================================================
+CosTab:CreateSection("Cosmetics Selection")
+
+local selectedCosmetic = ""
+CosTab:CreateDropdown({
+    Name = "Select Cosmetic Item",
+    Options = availableCosmetics,
+    CurrentOption = {""},
+    MultipleOptions = false,
+    Flag = "CosmeticsDropdown",
+    Callback = function(Option) selectedCosmetic = Option[1] end,
+})
+
+CosTab:CreateSection("Local Application (Always Works, Visual Only)")
+CosTab:CreateButton({
+    Name = "Equip Cosmetic Locally",
+    Callback = function()
+        if selectedCosmetic == "" then Rayfield:Notify({ Title = "Error", Content = "Please select a cosmetic first.", Duration = 3 }); return end
+        GiveLocalCosmetic(selectedCosmetic)
+        Rayfield:Notify({ Title = "Cosmetic Applied", Content = "Successfully applied " .. selectedCosmetic .. " locally!", Duration = 3 })
+    end,
+})
+
+CosTab:CreateSection("Server Application (Requires Admin Permissions)")
+CosTab:CreateButton({
+    Name = "Attempt FE Global Cosmetic",
+    Callback = function()
+        if selectedCosmetic == "" then Rayfield:Notify({ Title = "Error", Content = "Please select a cosmetic first.", Duration = 3 }); return end
+        AttemptGlobalCosmetic(selectedCosmetic)
+    end,
+})
+
+Rayfield:Notify({ Title = "Loaded", Content = "Nova Hub is Ready.", Duration = 3, Image = 4483362458 })
+
